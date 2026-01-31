@@ -1,5 +1,6 @@
 // Supabase Edge Function for Google Calendar Sync
 // Handles event creation/update and Meet link generation
+// Uses OAuth refresh token for tutors@jaycetutoring.com
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -23,72 +24,38 @@ interface GoogleTokenResponse {
   access_token: string;
   expires_in: number;
   token_type: string;
+  error?: string;
+  error_description?: string;
 }
 
-// Get access token using service account
+// Get access token using OAuth refresh token
 async function getAccessToken(): Promise<string> {
-  const serviceAccountKey = JSON.parse(Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY") || "{}");
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+  const refreshToken = Deno.env.get("GOOGLE_REFRESH_TOKEN");
 
-  if (!serviceAccountKey.client_email || !serviceAccountKey.private_key) {
-    throw new Error("Invalid service account configuration");
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Missing Google OAuth credentials. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN");
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const claim = {
-    iss: serviceAccountKey.client_email,
-    scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  };
-
-  // Create JWT
-  const encoder = new TextEncoder();
-  const headerB64 = btoa(JSON.stringify(header));
-  const claimB64 = btoa(JSON.stringify(claim));
-  const unsignedToken = `${headerB64}.${claimB64}`;
-
-  // Sign with private key
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    pemToArrayBuffer(serviceAccountKey.private_key),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    privateKey,
-    encoder.encode(unsignedToken)
-  );
-
-  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  const jwt = `${unsignedToken}.${signatureB64}`;
-
-  // Exchange JWT for access token
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
   });
 
   const tokenData: GoogleTokenResponse = await tokenResponse.json();
-  return tokenData.access_token;
-}
 
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const b64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\n/g, "");
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  if (tokenData.error) {
+    throw new Error(`OAuth error: ${tokenData.error_description || tokenData.error}`);
   }
-  return bytes.buffer;
+
+  return tokenData.access_token;
 }
 
 // Create or update Google Calendar event
