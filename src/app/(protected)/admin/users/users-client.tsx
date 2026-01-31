@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -244,7 +244,7 @@ export function UsersClient({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="role">Role</Label>
-                      <Select
+                      <NativeSelect
                         id="role"
                         name="role"
                         required
@@ -451,7 +451,7 @@ export function UsersClient({
                       ))}
                   </TableCell>
                   <TableCell>
-                    <Select
+                    <NativeSelect
                       value={user.status}
                       onChange={(e) => handleStatusChange(user.id, e.target.value)}
                       options={[

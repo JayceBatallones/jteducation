@@ -1,11 +1,52 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs))
 }
 
-// Cohort colors - sequential palette
+// Feature flags
+export const FEATURE_FLAGS = {
+  ENABLE_CONSULTS: process.env.NEXT_PUBLIC_ENABLE_CONSULTS === "true",
+  ENABLE_RESCHEDULE: process.env.NEXT_PUBLIC_ENABLE_RESCHEDULE === "true",
+};
+
+// When2Meet grid constants
+export const DAYS_OF_WEEK = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+// Time slots from 6am to 10pm (30-minute intervals)
+export const TIME_SLOTS: string[] = [];
+for (let hour = 6; hour <= 22; hour++) {
+  TIME_SLOTS.push(`${hour.toString().padStart(2, "0")}:00`);
+  if (hour < 22) {
+    TIME_SLOTS.push(`${hour.toString().padStart(2, "0")}:30`);
+  }
+}
+
+export function getTimeLabel(slot: string): string {
+  const [hours, minutes] = slot.split(":").map(Number);
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+}
+
+export function getTimeSlotCount(grid?: boolean[][]): number {
+  if (!grid) {
+    // Return total possible slots per day (6am to 10pm in 30-min intervals)
+    return TIME_SLOTS.length;
+  }
+  return grid.reduce((total, day) => total + day.filter(Boolean).length, 0);
+}
+
+// Cohort color palette
 export const COHORT_COLORS = [
   "#FF6B6B",
   "#4ECDC4",
@@ -17,44 +58,8 @@ export const COHORT_COLORS = [
   "#85C1E2",
   "#F8B88B",
   "#ABEBC6",
-] as const;
+];
 
 export function getCohortColor(index: number): string {
   return COHORT_COLORS[index % COHORT_COLORS.length];
 }
-
-// Time slot utilities for when2meet grid
-export const TIME_SLOTS = {
-  START_HOUR: 6, // 6am
-  END_HOUR: 22, // 10pm
-  SLOT_MINUTES: 30,
-} as const;
-
-export function getTimeSlotCount(): number {
-  return ((TIME_SLOTS.END_HOUR - TIME_SLOTS.START_HOUR) * 60) / TIME_SLOTS.SLOT_MINUTES;
-}
-
-export function getTimeLabel(slotIndex: number): string {
-  const totalMinutes = TIME_SLOTS.START_HOUR * 60 + slotIndex * TIME_SLOTS.SLOT_MINUTES;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const period = hours >= 12 ? "PM" : "AM";
-  const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
-}
-
-export const DAYS_OF_WEEK = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
-
-// Feature flags
-export const FEATURE_FLAGS = {
-  ENABLE_CONSULTS: process.env.NEXT_PUBLIC_ENABLE_CONSULTS === "true",
-  ENABLE_RESCHEDULE: process.env.NEXT_PUBLIC_ENABLE_RESCHEDULE === "true",
-} as const;

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { When2MeetGrid } from "@/components/availability/when2meet-grid";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -349,7 +349,7 @@ export function OnboardingForm({ programs }: OnboardingFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="teachingPreference">Teaching Style Preference</Label>
-                <Select
+                <NativeSelect
                   id="teachingPreference"
                   value={teachingPreference}
                   onChange={(e) => setTeachingPreference(e.target.value)}

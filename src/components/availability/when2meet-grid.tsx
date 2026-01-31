@@ -108,7 +108,7 @@ export function When2MeetGrid({
   // Generate time labels (show every hour)
   const timeLabels = [];
   for (let i = 0; i < slotCount; i += 2) {
-    timeLabels.push({ index: i, label: getTimeLabel(i) });
+    timeLabels.push({ index: i, label: getTimeLabel(TIME_SLOTS[i]) });
   }
 
   return (

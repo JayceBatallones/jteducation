@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -131,7 +131,7 @@ export function TutorEventsClient({ events, cohorts, updateEventTime }: TutorEve
       </div>
 
       <div className="flex gap-4">
-        <Select
+        <NativeSelect
           value={selectedCohort}
           onChange={(e) => setSelectedCohort(e.target.value)}
           options={[
@@ -143,7 +143,7 @@ export function TutorEventsClient({ events, cohorts, updateEventTime }: TutorEve
           ]}
           className="w-[200px]"
         />
-        <Select
+        <NativeSelect
           value={timeFilter}
           onChange={(e) => setTimeFilter(e.target.value)}
           options={[

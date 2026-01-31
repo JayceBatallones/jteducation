@@ -14,6 +14,8 @@ import {
   ClipboardCheck,
   ListTodo,
   CalendarClock,
+  BarChart3,
+  UserCog,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -55,7 +57,9 @@ export function Sidebar({ links }: SidebarProps) {
 // Predefined link sets for different roles
 export const adminLinks: SidebarLink[] = [
   { href: "/admin", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+  { href: "/admin/reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
   { href: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
+  { href: "/admin/status", label: "Status Mgmt", icon: <UserCog className="h-4 w-4" /> },
   { href: "/admin/waitlist", label: "Waitlist", icon: <ListTodo className="h-4 w-4" /> },
   { href: "/admin/reschedules", label: "Reschedules", icon: <CalendarClock className="h-4 w-4" /> },
   { href: "/admin/programs", label: "Programs", icon: <BookOpen className="h-4 w-4" /> },

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -155,7 +155,7 @@ export function EventsClient({
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="event_type">Event Type</Label>
-                  <Select
+                  <NativeSelect
                     id="event_type"
                     name="event_type"
                     value={eventType}
@@ -171,7 +171,7 @@ export function EventsClient({
                 {eventType !== "drop-in" ? (
                   <div className="space-y-2">
                     <Label htmlFor="cohort_id">Cohort</Label>
-                    <Select
+                    <NativeSelect
                       id="cohort_id"
                       name="cohort_id"
                       required
@@ -185,7 +185,7 @@ export function EventsClient({
                 ) : (
                   <div className="space-y-2">
                     <Label htmlFor="program_id">Program</Label>
-                    <Select
+                    <NativeSelect
                       id="program_id"
                       name="program_id"
                       required
@@ -230,7 +230,7 @@ export function EventsClient({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="recurrence_day">Day of Week</Label>
-                      <Select
+                      <NativeSelect
                         id="recurrence_day"
                         name="recurrence_day"
                         options={daysOfWeek}

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   Table,
   TableBody,
@@ -105,7 +105,7 @@ export function AttendanceClient({
       </div>
 
       <div className="flex gap-4">
-        <Select
+        <NativeSelect
           value={selectedCohort}
           onChange={(e) => setSelectedCohort(e.target.value)}
           options={[
