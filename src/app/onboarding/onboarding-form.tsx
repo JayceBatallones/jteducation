@@ -1,17 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { NativeSelect } from "@/components/ui/native-select";
 import { When2MeetGrid } from "@/components/availability/when2meet-grid";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { getTimeSlotCount } from "@/lib/utils";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  GraduationCap,
+  BookOpen,
+  Calendar,
+  FileCheck
+} from "lucide-react";
+import { getTimeSlotCount, cn } from "@/lib/utils";
 
 interface Program {
   id: string;
@@ -19,24 +27,43 @@ interface Program {
   description: string | null;
 }
 
+interface OnboardingData {
+  parentName: string;
+  parentEmail: string;
+  parentPassword: string;
+  parentPhone: string;
+  studentName: string;
+  studentEmail: string;
+  studentPassword: string;
+  programId: string;
+  studentMotivation: string;
+  teachingPreference: string;
+  availability: boolean[][];
+  timezone: string;
+  consentContact: boolean;
+  consentRecording: boolean;
+  consentTerms: boolean;
+}
+
 interface OnboardingFormProps {
   programs: Program[];
+  onSubmit: (data: OnboardingData) => Promise<{ success: boolean; error?: string }>;
 }
 
 const STEPS = [
-  { id: 1, title: "Parent Info", description: "Your contact details" },
-  { id: 2, title: "Student Info", description: "Student details" },
-  { id: 3, title: "Program", description: "Select a program" },
-  { id: 4, title: "Availability", description: "Weekly schedule" },
-  { id: 5, title: "Consent", description: "Terms and conditions" },
+  { id: 1, title: "Parent Info", description: "Your contact details", icon: User },
+  { id: 2, title: "Student Info", description: "Student details", icon: GraduationCap },
+  { id: 3, title: "Program", description: "Select a program", icon: BookOpen },
+  { id: 4, title: "Availability", description: "Weekly schedule", icon: Calendar },
+  { id: 5, title: "Consent", description: "Terms and conditions", icon: FileCheck },
 ];
 
-export function OnboardingForm({ programs }: OnboardingFormProps) {
+export function OnboardingForm({ programs, onSubmit }: OnboardingFormProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   // Form state
   const [parentName, setParentName] = useState("");
@@ -106,6 +133,7 @@ export function OnboardingForm({ programs }: OnboardingFormProps) {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
+      setCompletedSteps(prev => new Set([...prev, currentStep]));
       setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
     }
   };
@@ -115,6 +143,20 @@ export function OnboardingForm({ programs }: OnboardingFormProps) {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
+  const goToStep = (stepId: number) => {
+    // Can only go to steps that are completed or the next available step
+    if (stepId <= currentStep || completedSteps.has(stepId - 1) || stepId === 1) {
+      // Validate all steps up to the target step
+      if (stepId < currentStep) {
+        setError(null);
+        setCurrentStep(stepId);
+      } else if (stepId === currentStep + 1 && validateStep(currentStep)) {
+        setCompletedSteps(prev => new Set([...prev, currentStep]));
+        setCurrentStep(stepId);
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) return;
 
@@ -122,50 +164,29 @@ export function OnboardingForm({ programs }: OnboardingFormProps) {
     setError(null);
 
     try {
-      // Create parent account
-      const { data: parentAuth, error: parentError } = await supabase.auth.signUp({
-        email: parentEmail,
-        password: parentPassword,
-        options: {
-          data: {
-            full_name: parentName,
-            role: "parent",
-            timezone,
-            phone: parentPhone,
-          },
-        },
+      const result = await onSubmit({
+        parentName,
+        parentEmail,
+        parentPassword,
+        parentPhone,
+        studentName,
+        studentEmail,
+        studentPassword,
+        programId,
+        studentMotivation,
+        teachingPreference,
+        availability,
+        timezone,
+        consentContact,
+        consentRecording,
+        consentTerms,
       });
 
-      if (parentError) throw new Error(`Parent registration failed: ${parentError.message}`);
-      if (!parentAuth.user) throw new Error("Parent account creation failed");
+      if (!result.success) {
+        throw new Error(result.error || "Registration failed");
+      }
 
-      // Create student account (separate signup)
-      const { data: studentAuth, error: studentError } = await supabase.auth.signUp({
-        email: studentEmail,
-        password: studentPassword,
-        options: {
-          data: {
-            full_name: studentName,
-            role: "student",
-            timezone,
-          },
-        },
-      });
-
-      if (studentError) throw new Error(`Student registration failed: ${studentError.message}`);
-      if (!studentAuth.user) throw new Error("Student account creation failed");
-
-      // Wait a moment for triggers to create profiles
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Link parent to student (need to use service role for this, so we'll do it via API)
-      // For now, we'll store the link request and let admin approve
-      // The parent_student_links table will be populated by the database trigger or admin
-
-      // Store student's availability and program preference
-      // This will be done when the student confirms their email and logs in
-
-      toast.success("Registration submitted! Check your email to confirm your accounts.");
+      toast.success("Registration submitted! An administrator will review your application.");
       router.push("/onboarding/success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -175,43 +196,88 @@ export function OnboardingForm({ programs }: OnboardingFormProps) {
     }
   };
 
+  const currentStepData = STEPS[currentStep - 1];
+
   return (
-    <div className="space-y-6">
-      {/* Progress Steps */}
-      <div className="flex justify-between items-center">
-        {STEPS.map((step, index) => (
-          <div key={step.id} className="flex items-center">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                currentStep > step.id
-                  ? "bg-primary text-primary-foreground"
-                  : currentStep === step.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {currentStep > step.id ? <Check className="h-4 w-4" /> : step.id}
-            </div>
-            {index < STEPS.length - 1 && (
-              <div
-                className={`w-12 h-1 mx-1 ${
-                  currentStep > step.id ? "bg-primary" : "bg-muted"
-                }`}
-              />
-            )}
-          </div>
-        ))}
+    <div className="space-y-8">
+      {/* Progress Steps - Improved UI */}
+      <div className="relative">
+        {/* Progress Line Background */}
+        <div className="absolute top-6 left-0 right-0 h-0.5 bg-muted" />
+
+        {/* Progress Line Fill */}
+        <div
+          className="absolute top-6 left-0 h-0.5 bg-gradient-to-r from-primary to-primary/80 transition-all duration-500"
+          style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+        />
+
+        {/* Steps */}
+        <div className="relative flex justify-between">
+          {STEPS.map((step) => {
+            const isCompleted = completedSteps.has(step.id) || currentStep > step.id;
+            const isCurrent = currentStep === step.id;
+            const isClickable = step.id <= currentStep || completedSteps.has(step.id - 1) || step.id === 1;
+            const StepIcon = step.icon;
+
+            return (
+              <div key={step.id} className="flex flex-col items-center">
+                {/* Step Circle */}
+                <button
+                  type="button"
+                  onClick={() => goToStep(step.id)}
+                  disabled={!isClickable || loading}
+                  className={cn(
+                    "relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                    isCompleted && "bg-primary text-primary-foreground shadow-lg shadow-primary/25",
+                    isCurrent && "bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-lg shadow-primary/30",
+                    !isCompleted && !isCurrent && "bg-muted text-muted-foreground",
+                    isClickable && !loading && "cursor-pointer hover:scale-110",
+                    !isClickable && "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  {isCompleted && !isCurrent ? (
+                    <Check className="h-5 w-5" />
+                  ) : (
+                    <StepIcon className="h-5 w-5" />
+                  )}
+
+                  {/* Pulse animation for current step */}
+                  {isCurrent && (
+                    <span className="absolute inset-0 rounded-full animate-ping bg-primary/30" />
+                  )}
+                </button>
+
+                {/* Step Label */}
+                <div className="mt-3 text-center">
+                  <p className={cn(
+                    "text-xs font-medium transition-colors",
+                    isCurrent ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {step.title}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Step Title */}
-      <div className="text-center">
-        <h2 className="text-xl font-semibold">{STEPS[currentStep - 1].title}</h2>
-        <p className="text-sm text-muted-foreground">{STEPS[currentStep - 1].description}</p>
+      {/* Current Step Header */}
+      <div className="text-center space-y-2 py-4">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
+          <currentStepData.icon className="h-4 w-4" />
+          Step {currentStep} of {STEPS.length}
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight">{currentStepData.title}</h2>
+        <p className="text-muted-foreground">{currentStepData.description}</p>
       </div>
 
       {/* Error Display */}
       {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+          <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
           {error}
         </div>
       )}
@@ -318,11 +384,10 @@ export function OnboardingForm({ programs }: OnboardingFormProps) {
                         key={program.id}
                         type="button"
                         onClick={() => setProgramId(program.id)}
-                        className={`p-4 rounded-lg border text-left transition-colors ${
-                          programId === program.id
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:bg-muted/50"
-                        }`}
+                        className={`p-4 rounded-lg border text-left transition-colors ${programId === program.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-muted/50"
+                          }`}
                       >
                         <div className="font-medium">{program.name}</div>
                         {program.description && (

@@ -112,12 +112,53 @@ async function enrollStudent(studentId: string, cohortId: string) {
 
   const supabase = await createAdminClient();
 
-  const { error } = await supabase.from("cohort_students").insert({
+  // Create cohort enrollment
+  const { error: enrollError } = await supabase.from("cohort_students").insert({
     student_id: studentId,
     cohort_id: cohortId,
   });
 
-  if (error) throw new Error(error.message);
+  if (enrollError) throw new Error(enrollError.message);
+
+  // Get all required (content) events for this cohort
+  const { data: contentEvents } = await supabase
+    .from("events")
+    .select("id")
+    .eq("cohort_id", cohortId)
+    .eq("is_required", true);
+
+  // Auto-create bookings and attendance for content events
+  if (contentEvents && contentEvents.length > 0) {
+    // Create event bookings
+    const bookings = contentEvents.map((event) => ({
+      user_id: studentId,
+      event_id: event.id,
+    }));
+
+    const { error: bookingError } = await supabase
+      .from("event_bookings")
+      .insert(bookings);
+
+    if (bookingError) {
+      console.error("Failed to create event bookings:", bookingError);
+    }
+
+    // Create attendance records (pre-populated as NULL status)
+    const attendance = contentEvents.map((event) => ({
+      user_id: studentId,
+      event_id: event.id,
+      status: null, // NULL = not yet marked
+    }));
+
+    const { error: attendanceError } = await supabase
+      .from("attendance")
+      .insert(attendance);
+
+    if (attendanceError) {
+      console.error("Failed to create attendance records:", attendanceError);
+    }
+  }
+
   revalidatePath("/admin/users");
 }
 
@@ -126,6 +167,31 @@ async function unenrollStudent(studentId: string, cohortId: string) {
 
   const supabase = await createAdminClient();
 
+  // Get all events for this cohort
+  const { data: cohortEvents } = await supabase
+    .from("events")
+    .select("id")
+    .eq("cohort_id", cohortId);
+
+  // Remove attendance records for cohort events
+  if (cohortEvents && cohortEvents.length > 0) {
+    const eventIds = cohortEvents.map((e) => e.id);
+
+    await supabase
+      .from("attendance")
+      .delete()
+      .eq("user_id", studentId)
+      .in("event_id", eventIds);
+
+    // Remove event bookings for cohort events
+    await supabase
+      .from("event_bookings")
+      .delete()
+      .eq("user_id", studentId)
+      .in("event_id", eventIds);
+  }
+
+  // Remove cohort enrollment
   const { error } = await supabase
     .from("cohort_students")
     .delete()

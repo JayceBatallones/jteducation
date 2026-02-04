@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
-import { createClient } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/supabase/server";
 import { Header } from "@/components/layout/header";
 import "./globals.css";
 
@@ -17,18 +17,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
+  const { profile } = await getProfile();
 
   return (
     <html lang="en" suppressHydrationWarning>

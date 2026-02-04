@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, BookOpen, Clock } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +9,7 @@ async function updateAttendance(eventId: string, status: "attending" | "not_atte
   "use server";
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getUser();
 
   if (!user) {
     return { error: "Not authenticated" };
@@ -50,7 +50,7 @@ async function updateAttendance(eventId: string, status: "attending" | "not_atte
 
 export default async function StudentDashboard() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getUser();
 
   if (!user) return null;
 

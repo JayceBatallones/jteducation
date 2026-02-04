@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getProfileRole } from "@/lib/supabase/server";
 import { Sidebar, tutorLinks } from "@/components/layout/sidebar";
 
 export default async function TutorLayout({
@@ -7,21 +7,13 @@ export default async function TutorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
+  const { role, userId } = await getProfileRole();
 
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!userId) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "tutor" && profile?.role !== "admin") {
+  if (role !== "tutor" && role !== "admin") {
     redirect("/dashboard");
   }
 

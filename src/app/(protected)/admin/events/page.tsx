@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { EventsClient } from "./events-client";
 
 async function createEvent(formData: FormData) {
   "use server";
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const eventType = formData.get("event_type") as string;
   const cohortId = formData.get("cohort_id") as string;
@@ -19,21 +19,67 @@ async function createEvent(formData: FormData) {
   const recurrenceTime = formData.get("recurrence_time") as string;
   const recurrenceEndDate = formData.get("recurrence_end_date") as string;
 
-  const { error } = await supabase.from("events").insert({
-    cohort_id: eventType !== "drop-in" ? cohortId : null,
-    program_id: eventType === "drop-in" ? programId : null,
-    title,
-    start_time: startTime,
-    end_time: endTime,
-    event_type: eventType as "content" | "applied" | "drop-in",
-    is_required: eventType === "content" ? true : isRequired,
-    recurrence_pattern: recurrenceDay
-      ? { day: recurrenceDay, time: recurrenceTime, freq: "weekly" }
-      : null,
-    recurrence_end_date: recurrenceEndDate || null,
-  });
+  // Create the event
+  const { data: newEvent, error } = await supabase
+    .from("events")
+    .insert({
+      cohort_id: eventType !== "drop-in" ? cohortId : null,
+      program_id: eventType === "drop-in" ? programId : null,
+      title,
+      start_time: startTime,
+      end_time: endTime,
+      event_type: eventType as "content" | "applied" | "drop-in",
+      is_required: eventType === "content" ? true : isRequired,
+      recurrence_pattern: recurrenceDay
+        ? { day: recurrenceDay, time: recurrenceTime, freq: "weekly" }
+        : null,
+      recurrence_end_date: recurrenceEndDate || null,
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // For drop-in events, auto-enroll ALL students in the program
+  if (eventType === "drop-in" && programId && newEvent) {
+    // Get all cohorts for this program
+    const { data: cohorts } = await supabase
+      .from("cohorts")
+      .select("id")
+      .eq("program_id", programId);
+
+    if (cohorts && cohorts.length > 0) {
+      const cohortIds = cohorts.map((c) => c.id);
+
+      // Get all students enrolled in any cohort of this program
+      const { data: enrollments } = await supabase
+        .from("cohort_students")
+        .select("student_id")
+        .in("cohort_id", cohortIds);
+
+      if (enrollments && enrollments.length > 0) {
+        const studentIds = [...new Set(enrollments.map((e) => e.student_id))];
+
+        // Create event bookings for all students
+        const bookings = studentIds.map((studentId) => ({
+          user_id: studentId,
+          event_id: newEvent.id,
+        }));
+
+        await supabase.from("event_bookings").insert(bookings);
+
+        // Create attendance records (pre-populated as NULL)
+        const attendance = studentIds.map((studentId) => ({
+          user_id: studentId,
+          event_id: newEvent.id,
+          status: null,
+        }));
+
+        await supabase.from("attendance").insert(attendance);
+      }
+    }
+  }
+
   revalidatePath("/admin/events");
 }
 
